@@ -85,12 +85,6 @@ plot_dark <- plot_right +
   scale_size_manual(values=c(0.8, 1))
 ```
 
-class: middle, inverse
-
-# Source attribution
-
----
-
 ## New Zealand campylobacteriosis cases
 
 ```{r nz_cases, fig.dim=c(10, 5)}
@@ -103,17 +97,7 @@ ggplot(nz, aes(x=Date, y=Rate)) + geom_line(col='grey50') +
 
 ---
 
-## Data: Source Assigned Campylobacteriosis in New Zealand (SACNZ)
-
-- 650 human cases of campylobacteriosis in Auckland and Manawatu regions of NZ.
-
-- Approximately 200 each of poultry, cattle and sheep isolates of *Campylobacter* collected during the same period.
-
-- Can we assign each human case to one of these three sources?
-
----
-
-## Where are people getting it from?
+## Where are people getting campylobacteriosis from??
 
 <div align="center">
 <span class='inline'>
@@ -171,181 +155,21 @@ ggplot(top20, aes(x=ST, y=Count, fill=Colour)) + geom_col(data=top_humans, aes(y
 
 ---
 
-## Adding some statistics : Dirichlet model
-
-Before we collect data, assume each type is equally likely for each source.
-
-```{r, fig.dim=c(10, 3.5)}
-set.seed(5)
-top50 <- sts %>% mutate(ST = fct_lump(factor(ST), n=49, w=Human)) %>%
-  gather(Source, Count, -ST) %>% 
-  group_by(ST, Source) %>% summarise(Count = sum(Count)) %>%
-  ungroup() %>% spread(Source, Count) %>%
-  mutate(ST = fct_reorder(ST, Human, .fun = identity, .desc=TRUE),
-                          ST = fct_relevel(ST, "Other", after = 50)) %>%
-  select(ST, Poultry) %>% uncount(Poultry) %>%
-  sample_n(100) %>% count(ST, name = "Poultry", .drop=FALSE) %>%
-  mutate(Prior = 1) %>%
-  gather(Source, Count, -ST) %>% mutate(Proportion = Count/sum(Count))
-scale_fact <- 1/sum(top50$Count)
-
-ggplot(top50 %>% filter(Source == "Prior"), aes(x=ST, y=Count)) + geom_col(fill="grey50") +
-  scale_y_continuous("Count", expand=c(0,0)) +
-  coord_cartesian(ylim = c(0,25)) +
-  theme(axis.title.x = element_blank(),
-        axis.text.x = element_text(angle = 90, vjust=0.5))
-```
-
----
-
-## Adding some statistics: Dirichlet model
-
-Then add the observed counts.
-
-```{r, fig.dim=c(10, 3.5)}
-ggplot(top50, aes(x=ST, y=Count, fill=Source)) + geom_col() +
-  scale_y_continuous("Count", expand=c(0,0)) +
-  scale_fill_manual(values=c(Poultry = "steelblue", Prior = "grey40")) +
-  guides(fill='none') +
-  coord_cartesian(ylim = c(0,25)) +
-  theme(axis.title.x = element_blank(),
-        axis.text.x = element_text(angle = 90, vjust=0.5))
-```
-
----
-
-## Adding some statistics: Dirichlet model
-
-And convert to proportions.
-
-```{r, fig.dim=c(10, 3.5)}  
-ggplot(top50, aes(x=ST, y=Proportion, fill=Source)) + geom_col() +
-  scale_y_continuous("Percent", labels = scales::percent_format(accuracy=1, suffix=""), expand=c(0,0)) +
-  scale_fill_manual(values=c(Poultry = "steelblue", Prior = "grey50")) +
-  guides(fill='none') +
-  coord_cartesian(ylim = c(0,25*scale_fact)) +
-  theme(axis.title.x = element_blank(),
-        axis.text.x = element_text(angle = 90, vjust=0.5))
-```
-
----
-
-## Adding some statistics: Dirichlet model
-
-The model gives us a measure of uncertainty
-
-<div class='center-fig'>
-  <img src="figures/dirichlet_uncertainty.gif" style="height: 360px"/>
-</div>
-
----
-
-## Dirichlet model | S.J. Liao 2019
-
-The prior and data model are:
-
-$$
-\begin{aligned}
-\mathbf{\pi}_j &\sim \mathsf{Dirichlet}(\mathbf{\alpha}_j)\\
-\mathbf{X}_{j} &\sim \mathsf{Multinomial}(n_j, \mathbf{\pi}_j)
-\end{aligned}
-$$
-
-so that the posterior is
-$$
-\mathbf{\pi}_{j} \sim \mathsf{Dirichlet}(\mathbf{X}_j + \mathbf{\alpha}_j)
-$$
-
-where $\pi_j$ is the genotype distribution, $\mathbf{X}_j$ are the counts, and $\mathbf{\alpha}_j$ is the prior for source $j$.
-
----
-
-## Genotype distributions
-
-```{r, fig.dim=c(10, 5)}
-genotype_fit <- read_csv("data/dirichlet_island/genotypes.csv") %>%
-  mutate(Source = factor(Source, levels = c("Poultry", "Ruminants", "Other", "Water")))
-
-common_sts <- c(474, 45, 50, 53, 48, 61, 190, 42) #, 354, 520)
-plot_common <- genotype_fit %>% filter(ST %in% common_sts) %>%
-  mutate(ST = factor(ST, levels=common_sts, labels = paste0("ST-", common_sts)),
-         Source = fct_recode(Source, Rum = "Ruminants"))
-
-ggplot(plot_common) + geom_linerange(aes(x=Source, ymin = lci, ymax=uci, group=Model), position=position_dodge(0.5)) + 
-  geom_linerange(aes(x=Source, ymin = lcl, ymax = ucl, col=Model), size=2, position=position_dodge(0.5)) +
-  geom_point(aes(x=Source, y=m, fill=Model), position=position_dodge(0.5), shape=21, size=2) +
-  facet_wrap(~ST, nrow=2) +
-  xlab("") +
-  scale_y_continuous(name = "P(Source | ST)", limits=c(0,1), expand = c(0,0)) +
-  scale_fill_manual(values = c("steelblue2", "brown")) +
-  scale_colour_manual(values = c("steelblue2", "brown")) +
-  theme(legend.position = c(0.93,0.89),
-        legend.title = element_blank())
-```
-
----
-
-## Genotype distributions
-
-```{r, fig.dim=c(7, 5), out.width='70%'}
-sts <- c(403, 2343, 2026, 474)
-plot_weird <- genotype_fit %>% filter(ST %in% sts) %>%
-  mutate(ST = factor(ST, levels=sts, labels = paste0("ST-", sts)))
-
-ggplot(plot_weird) + geom_linerange(aes(x=Source, ymin = lci, ymax=uci, group=Model), position=position_dodge(0.5)) + 
-  geom_linerange(aes(x=Source, ymin = lcl, ymax = ucl, col=Model), size=2, position=position_dodge(0.5)) +
-  geom_point(aes(x=Source, y=m, fill=Model), position=position_dodge(0.5), shape=21, size=2) +
-  facet_wrap(~ST, nrow=2) +
-  xlab("") +
-  scale_y_continuous(name = "P(Source | ST)", limits=c(0,1), expand = c(0,0)) +
-  scale_fill_manual(values = c("steelblue2", "brown")) +
-  scale_colour_manual(values = c("steelblue2", "brown")) +
-  theme(legend.position = c(0.90,0.89),
-        legend.title = element_blank())
-```
-
----
-
-## Attribution results
-
-```{r, fig.dim=c(7, 4.5), out.width='70%'}
-overall <- read_csv("data/dirichlet_island/overall_attribution.csv") %>%
-  mutate(Source = fct_relevel(Source, "Other", after=2))
-
-ggplot(overall) + 
-  geom_boxplot(aes(x=Source, lower = lcl, upper=ucl, ymin=lci, ymax=uci, middle=m, fill=Source), stat="identity", alpha=0.7, width=0.6) +
-  scale_y_continuous(name="Attributed cases", labels=scales::percent_format(), limits=c(0,1), expand=c(0,0)) +
-  scale_fill_manual(values = source_cols) +
-  facet_wrap(~Model) +
-  guides(fill='none', col='none') +
-  theme(axis.title.x = element_blank(),
-        legend.position = c(0.90,0.89),
-        legend.title = element_blank())
-```
-
----
-
-class: middle, inverse
-
-# What if we have more genes?
-
----
+.left-code[
 
 ## What if we have more genes?
 
-- The SACNZ study used whole genome sequencing, so we can use core genome MLST with 1343 genes.
+- Recent studies use whole genome sequencing, so we can use many more genes (e.g. core genome MLST with 1343 genes).
 
-- With higher genomic precision, the counts used for the Dirichlet model will eventually drop to 1 of each as each isolate is likely unique.
+- With the whole genome, almost every isolate differs.
 
-- Worse than that, the human isolates will differ from all source isolates, so the source counts for them will be 0, so we lose all ability to discriminate.
+- Some genes might be more useful than others? e.g. the housekeeping genes used for the MLST scheme.
 
-- Maybe we should reduce this problem with feature selection (i.e. choosing which genes to include)
+- But just picking 7 genes at random gives the same answer!
+]
 
----
-
-## Just picking some genes at random does just as good as MLST...
-
-```{r, fig.dim=c(9,4.5), out.width='90%'}
+.right-plot[
+```{r}
 source_cols2 <- c(Poultry = "brown", Beef = "steelblue4", Sheep = "steelblue1")
 common_attr <- read_csv("data/dirichlet_island/many_genes_common.csv")
 random_attr <- common_attr %>% filter(str_detect(Genes, "Random"), str_detect(Data, "Full")) %>%
@@ -362,8 +186,10 @@ ggplot(random_attr, aes(x=Genes, y=`0.5`, fill=Source)) +
   scale_colour_manual(values = source_cols2) +
   scale_fill_manual(values = source_cols2) +
   guides(col='none', fill='none') +
+  scale_x_discrete(breaks= c("MLST", "R10"), labels = c('MLST', 'Sets of 7 random genes')) +
   theme(axis.title.x = element_blank())
 ```
+]
 
 ---
 
@@ -371,9 +197,7 @@ ggplot(random_attr, aes(x=Genes, y=`0.5`, fill=Source)) +
 
 - We have 1343 core genes available to us.
 
-- Our goal is to classify human isolates as coming from a set of sources.
-
-- Existing models break if we use too many genes.
+- Our goal is to classify human isolates to their most likely source.
 
 - Picking 7 random genes is just as good as MLST; so the genes are correlated.
 
@@ -381,27 +205,15 @@ ggplot(random_attr, aes(x=Genes, y=`0.5`, fill=Source)) +
 
 ---
 
-class: middle, inverse
-
-# Random Forests
-
----
-
 ## Can we use a Random Forest?
 
 - Random forests are perfect for classification problems with a large number of correlated predictors!
 
-- Train the forest on the source isolates, and predict on the human isolates - voila!
+- Use the source isolates as a training set.
 
---
+- Train our models then predict on the test set of human cases. Voila!
 
-- But, we have another two problems!
-
-- Our predictors are **categorical** (which allele each gene has), and many are highly diverse. Median number of alleles is 48.
-
-- Many alleles are seen in only one isolate.
-
-- Many alleles are seen in only one **human** isolate (so aren't in the training set).
+- But forests can be murky places...
 
 ---
 
@@ -464,23 +276,17 @@ plot_right
 
 class: inverse, middle
 
-# Solution 1: Encoding categorical variables
+# Encoding categorical variables
 
 ---
 
 ## Encoding categorical variables as numeric
 
-- One hot encoding: Replace the categorical predictor with binary indicators.
+- The alleles are just numbers, so why not treat them as such?
 
-    - Need to be careful how we choose preditors for each tree - typically biased towards predictors with more levels (bigger block of indicators to pick).
-    - Means only some alleles from a gene are considered in a given tree.
-    - Any allele we haven't seen is encoded as "not anything else".
+- The trees and forest can split a numeric variable wherever they like, so order maybe doesn't matter much?
 
-- Numeric encoding: Just treat the categories as ordered and use directly.
-
-    - The trees and forest can split a numeric variable wherever they like, so order maybe doesn't matter much?
-    - Alleles are already numeric, right?
-    - Any allele we haven't seen is already encoded as some other number.
+- Any allele we haven't seen is already encoded as some other number.
 
 ---
 
@@ -523,22 +329,24 @@ ggplot(dat_for_plot) +
 .left-code[
 ## Numeric encoding: Consequences
 
-Arning et. al. (unknowingly) used this encoding.
+Arning et. al.<sup>1</sup> used this encoding.
 
 Results from their work are less impressive when we randomise the
 allele labels.
+
+.footnote[[1] https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1009436]
 ]
 
 .right-plot[
-```{r}
-arning <- read_csv("data/arning_shuffle.csv") |> mutate(Method = fct_recode(Method, Published = "Paper Order")) |>
+```{r, fig.dim=c(4.8,4.2)}
+arning <- read_csv("data/arning_shuffle.csv") |> mutate(Method = fct_recode(Method, Published = "Paper Order", Randomised = "Reshuffled")) |>
   mutate(Measure = fct_recode(Measure, `Positive Predictive Value` = "Precision", Sensitivity = "Recall"))
 ggplot(arning) +
   geom_point(aes(x=Labels, y=value, col=Method), position=position_dodge(width=0.25)) +
   facet_wrap(vars(Measure), nrow=2) +
   labs(x=NULL, y=NULL, col=NULL) +
   theme(legend.position = 'bottom') +
-  scale_colour_manual(values = c(Published = 'black', Reshuffled = 'darkred')) +
+  scale_colour_manual(values = c(Published = 'black', Randomised = 'darkred')) +
   scale_y_continuous(limits = c(0,1))
 ```
 ]
@@ -620,7 +428,7 @@ tab2 |> arrange(A) |> knitr::kable()
 ## More than 2 sources
 
 .left-code[
-- Coppersmith (year) extended this to multiple sources.
+- Coppersmith (1999) extended this to multiple sources.
 
 - Order by the scores of the first principal component of the proportioned contingency table.
 
@@ -650,7 +458,7 @@ tab3 |> knitr::kable()
 ## More than 2 sources
 
 .left-code[
-- Coppersmith (year) extended this to multiple sources.
+- Coppersmith (1999) extended this to multiple sources.
 
 - Order by the scores of the first principal component of the proportioned contingency table.
 
@@ -732,9 +540,9 @@ tab4 |> mutate(order = tab4pc$x[,1]) |>
 
 - Split the source data into 5 sets.
 
-- Use cross-validation to assess precision.
+- Use cross-validation to assess performance (sensitivity).
 
-- Reasonably good effort for all sources.
+- Does well with poultry, less well with sheep and beef.
 ]
 
 .right-plot-narrow[
@@ -749,7 +557,7 @@ bias |> filter(uses_unique == "No", Ordering == "Poultry", method=="ranger") |>
   scale_y_continuous(limits=c(0,1)) +
   scale_shape_manual(values = c("circle filled", "circle")) +
   guides(shape = 'none', colour='none') +
-  labs(x=NULL, y="Sensitivity") +
+  labs(x=NULL, y="Proportion") +
   scale_colour_manual(values = source_cols2)
 ```
 ]
@@ -779,7 +587,7 @@ bias |> filter(uses_unique == "Yes", Ordering == "Poultry", method=="ranger") |>
   scale_y_continuous(limits=c(0,1)) +
   scale_shape_manual(values = c("circle filled", "circle")) +
   guides(shape = 'none', colour='none') +
-  labs(x=NULL, "Sensitivity") +
+  labs(x=NULL, y="Proportion") +
   scale_colour_manual(values = source_cols2)
 ```
 ]
@@ -811,7 +619,7 @@ bias |> filter(uses_unique == "Yes", Ordering == "Sheep", method=="ranger") |>
   scale_y_continuous(limits=c(0,1)) +
   scale_shape_manual(values = c("circle filled", "circle")) +
   guides(shape = 'none', colour='none') +
-  labs(x=NULL, y="Sensitivity") +
+  labs(x=NULL, y="Proportion") +
   scale_colour_manual(values = source_cols2)
 ```
 ]
@@ -834,7 +642,7 @@ bias |> filter(uses_unique == "Yes", method=="ranger") |>
   scale_y_continuous(limits=c(0,1)) +
   scale_shape_manual(values = c("circle filled", "circle")) +
   guides(shape = 'none', colour='none') +
-  labs(x=NULL, y="Sensitivity") +
+  labs(x=NULL, y="Proportion") +
   scale_colour_manual(values = source_cols2)
 ```
 
@@ -932,18 +740,23 @@ ggplot(dat |> filter(allele != "13")) +
 
 .right-plot-narrow[
 ```{r, fig.dim=c(3.2,4.8)}
+```{r, fig.dim=c(3.2,4.8)}
 datpc <- prcomp(dat |> select(x1,x2))
 
 dx <- datpc$rotation[1,1]*20
 dy <- datpc$rotation[2,1]*20
+pc_x1 <- mean(dat$x1) -dx
+pc_x2 <- mean(dat$x1) +dx
+pc_y1 <- mean(dat$x2) -dy
+pc_y2 <- mean(dat$x2) +dy
 
 ggplot(dat |> filter(allele != "13")) +
   geom_point(aes(x=x1, y=x2)) +
   geom_text(aes(x=x1, y=x2, label=allele), nudge_x=1, nudge_y=1) +
-  geom_segment(aes(x=mean(x1)-dx, y=mean(x2)-dy, xend=mean(x1)+dx,
-                   yend=mean(x2)+dy), col='darkred',
+  geom_segment(aes(x=pc_x1, y=pc_y1, xend=pc_x2,
+                   yend=pc_y2), col='darkred',
                arrow = arrow(length=unit(0.1, "inches"), type="closed", ends="both")) +
-  annotate("text", x=mean(dat$x1)+2, y=mean(dat$x2)-1, label="PCO1", col="darkred") +
+  annotate("text", x=mean(dat$x1)+3, y=mean(dat$x2)-1, label="PCO1", col="darkred") +
   coord_equal(xlim=c(-12,15), ylim=c(-26,21)) +
   theme(axis.ticks = element_blank(),
         axis.text = element_blank(),
@@ -969,19 +782,14 @@ ggplot(dat |> filter(allele != "13")) +
 
 .right-plot-narrow[
 ```{r, fig.dim=c(3.2,4.8)}
-datpc <- prcomp(dat |> select(x1,x2))
-
-dx <- datpc$rotation[1,1]*20
-dy <- datpc$rotation[2,1]*20
-
 ggplot(dat) +
   geom_point(aes(x=x1, y=x2, col=allele == "13")) +
   geom_text(aes(x=x1, y=x2, label=allele, col=allele=="13"), nudge_x=1, nudge_y=1) +
-  geom_segment(aes(x=mean(x1)-dx, y=mean(x2)-dy, xend=mean(x1)+dx,
-                   yend=mean(x2)+dy), col='darkred',
+  geom_segment(aes(x=pc_x1, y=pc_y1, xend=pc_x2,
+                   yend=pc_y2), col='darkred',
                arrow = arrow(length=unit(0.1, "inches"), type="closed", ends="both"),
                alpha=0.5) +
-  annotate("text", x=mean(dat$x1)+2, y=mean(dat$x2)-1, label="PCO1", col="darkred") +
+  annotate("text", x=mean(dat$x1)+3, y=mean(dat$x2)-1, label="PCO1", col="darkred") +
   geom_segment(data=edge_dat |> filter(allele == "13" | allele2 == "13"),
                aes(x=x1, y=x2, xend=y1, yend=y2), col='steelblue') +
   guides(colour = 'none') +
@@ -998,7 +806,9 @@ ggplot(dat) +
 .left-code[
 ## Encode by genetic distance
 
-- The ordering now no longer depends on the target source, so there is no potential for bias like with the Coppersmith technique.
+- The ordering now no longer depends on the target source, so there is no potential for the bias seen with target encoding.
+
+- Genetic encoding places each unique allele where it best fits based on distance to existing alleles, rather than treating them all the same like target encoding.
 
 - But, if genetic closeness does not associate with source closeness, we may not get a better result.
 ]
@@ -1027,9 +837,13 @@ pco_cap |> filter(Ordering == "Sheep") |>
 ---
 
 .left-code[
-## Attribution
+## Source Attribution
 
-For isolates with many unique alleles, the PCO method produces consistent predictions between trees that utilise the unique alleles and trees that don't.
+- Lots of the human isolates have unique alleles.
+
+- For isolates with many unique alleles, the PCO method produces consistent predictions between trees that utilise the unique alleles and trees that don't.
+
+- The distance measure is only using SNPs. Perhaps there's room to improve this?
 ]
 
 .right-plot[
