@@ -109,63 +109,43 @@ ggplot(nz, aes(x=Date, y=Rate)) + geom_line(col='grey50') +
 
 ---
 
-## MLST distribution of human cases
+.left-code[
+## Source attribution with MLST
 
-```{r, mlst dist human, fig.dim=c(10, 5)}
-# top 20 or so isolates
-top20 <- sts %>% mutate(ST = fct_lump(factor(ST), n=20, w=Human)) %>% gather(Source, Count, -ST) %>%
-  group_by(ST, Source) %>% summarise(Count = sum(Count)) %>% group_by(Source) %>% mutate(Count = Count/sum(Count)) %>% ungroup() %>%
-  spread(Source, Count) %>% mutate(ST = fct_reorder(ST, Human, .fun = identity, .desc=TRUE),
-                                   ST = fct_relevel(ST, "Other", after = 23)) %>%
-  gather(Source, Count, -ST, -Human) %>%
-  mutate(Source = fct_relevel(Source, "Other", after=2)) %>%
-  mutate(Colour = ST == "Other")
+- Genotype all the things.
 
-top_humans <- top20 %>% select(Human, ST, Colour) %>% unique()
-ggplot(top_humans, aes(x=ST, y=Human, fill=Colour)) + 
-  geom_col() +
-  scale_fill_manual(values=c("steelblue", "grey60")) +
-  scale_y_continuous("Percent human cases", labels = scales::percent, expand=c(0,0)) + 
-  coord_cartesian(ylim = c(0,0.25)) +
-  guides(fill='none') +
-  theme(axis.title.x = element_blank(),
-        axis.text.x = element_text(angle = 90, vjust=0.5))
+- A version of a gene is an **allele**.
+
+- Alleles are numbered based on order
+discovered and entered into PubMLST.
+
+- Look for similar allelic profiles.
+]
+
+.right-plot[
+```{r}
+set.seed(7)
+attr_data |> group_by(Source) |>
+  sample_n(2) |>
+  ungroup() |> mutate(TKT = if_else(Source == "Human" & TKT == 7, 51, TKT)) |>
+  select(Source, ASP:UNC) |>
+  knitr::kable()
 ```
-
----
-
-## MLSTs are source specific
-
-```{r source_specific_mlst, fig.dim=c(10, 5)}
-ggplot(top20, aes(x=ST, y=Count, fill=Colour)) + geom_col(data=top_humans, aes(y=Human), alpha=0.3) + geom_col(aes(y=Count)) +
-  scale_fill_manual(values=c("steelblue", "grey60")) +
-  scale_y_continuous("Percent isolates", labels = scales::percent, expand=c(0,0)) +
-  coord_cartesian(ylim = c(0,0.25)) +
-  facet_wrap(~Source) +
-  guides(fill='none') +
-  theme(axis.title.x = element_blank(),
-        axis.text.x = element_text(angle = 90, vjust=0.5))
-```
-
----
-
-## Assume human types are a mix of source types
-
-<iframe src="https://shiny.massey.ac.nz/jcmarsha/OHA2019/" style="border: none;"></iframe>
+]
 
 ---
 
 .left-code[
 
-## What if we have more genes?
+## Whole genome sequencing: over a thousand genes
 
-- Recent studies use whole genome sequencing, so we can use many more genes (e.g. core genome MLST with 1343 genes).
+- The core genome MLST scheme uses 1343 genes.
 
 - With the whole genome, almost every isolate differs.
 
 - Some genes might be more useful than others? e.g. the housekeeping genes used for the MLST scheme.
 
-- But just picking 7 genes at random gives the same answer!
+- Just picking 7 genes at random gives the same answer!
 ]
 
 .right-plot[
@@ -193,7 +173,7 @@ ggplot(random_attr, aes(x=Genes, y=`0.5`, fill=Source)) +
 
 ---
 
-## So where are we?
+## Source Attribution
 
 - We have 1343 core genes available to us.
 
