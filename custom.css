@@ -40,6 +40,20 @@
   padding-left: 1%;
 }
 
+.left-code-wider {
+/* color: #777; */
+  width: 68%;
+  height: 92%;
+  float: left;
+}
+
+.right-plot-narrower {
+  width: 30%;
+  float: right;
+  padding-left: 1%;
+}
+
+
 .remark-slide-number {
   position: inherit;
 }
