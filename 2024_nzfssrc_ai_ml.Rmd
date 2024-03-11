@@ -200,8 +200,7 @@ ggplot(random_attr, aes(x=Genes, y=`0.5`, fill=Source)) +
 .left-code[
 ## Problem 1: High cardinality categorical predictors.
 
-- When we build a tree, at each branching point, we need to choose a gene and decide which alleles should go
-down each branch in order to best separate the sources.
+- When we build a tree, at each branching point, we need to choose a gene and decide which alleles should go down each branch in order to best separate the sources.
 
 - Need to determine the subset of alleles assigned to the left branch.
 
@@ -221,22 +220,33 @@ plot(rp)
 ]
 ---
 
-.left-code[
 ## Problem 2: Unique alleles
 
-- Lots of alleles are unique to the test set (we only see them in humans).
+```{r, fig.dim=c(10,5)}
+foo <- read_csv("data/distance.csv")
 
-- We could ignore them, but it'll dramatically reduce the size of our dataset.
+long <- foo |> rowid_to_column('human') |>
+  pivot_longer(-human, names_to='gene', values_to='distance')
 
-- Lots of the 'unique alleles' are really similar (one SNP difference) from another
-allele we have seen before.
-]
+g1 <- long |> extract(gene, into='gene', regex="([[:digit:]]+)") |>
+  ggplot() +
+  geom_raster(aes(x=gene, y=human, fill=distance > 0)) +
+  theme_void() +
+  scale_fill_manual(values=c(`FALSE` = 'white', `TRUE`='black')) +
+  guides(fill='none') +
+  scale_y_continuous(expand=c(0,0))
 
-.right-plot[
-```{r}
-plot_right
+g2 <- dist_margin |> ggplot() +
+  geom_col(aes(y=human, x=n), orientation='y',
+           fill='grey70') +
+  scale_x_log10() +
+  geom_vline(xintercept=12, linewidth=0.3) +
+  scale_y_continuous(expand=c(0,0)) +
+  theme_void()
+
+g2
+g1 + g2 + plot_layout(widths=c(10,1))
 ```
-]
 
 ---
 
@@ -251,6 +261,8 @@ plot_right
 - When we try and optimise our training (e.g. by using cross validation) then the validation set may also have unique alleles.
 
 - And even within a tree (where the data are all 'observed'), by the time we get down a few branches we may no longer have any isolates of a certain allele left, so can't train with that allele.
+
+- The trained model has no knowledge of what to do in these cases.
 
 ---
 
